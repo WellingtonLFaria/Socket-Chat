@@ -1,93 +1,66 @@
 import socket
-import sys
 import threading
+import sys
 
+try:
+    HOST = sys.argv[1]
+    PORT = int(sys.argv[2])
+except:
+    HOST = "localhost"
+    PORT = 8080
 
-def main():
-    """Coloca o servidor em execução no host e port informada na chamada do sistema ou nas configurações padrão:
-        
-        host: 'localhost'
-        port: 8080
+class Connection:
+    def __init__(self, conn, address) -> None:
+        self.conn = conn
+        self.address = address
+
+class Message:
+    def __init__(self, connection: Connection, message: str) -> None:
+        self.connection = connection
+        self.message = message
+
+class Server:
+    def __init__(self, host: str, port: int) -> None:
+        self.host = host
+        self.port = port
+        self.connections: list[Connection] = []
+        self.messages: list[Message] = []
+        self.startServer()
+        t1 = threading.Thread(target=self.sendMessageService).start()
+        t2 = threading.Thread(target=self.acceptConnectionService).start()
     
-        E cria as threads de envio e recebimento de mensagens.
+    def startServer(self) -> None:
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.bind((self.host, self.port))
+        self.server.listen()
+        print(f"Server listening at {self.host}:{self.port} ...")
 
-        Argumentos:
-            HOST: Endereço de IP host do servidor. (Chamada do sistema)
-            PORT: Porta do servidor. (Chamada do sistema)
-        
-        Retorno:
-            Sem retorno.
-    """
-    try:
-        HOST = sys.argv[1]
-        PORT = int(sys.argv[2])
-    except:
-        HOST = 'localhost'
-        PORT = 8080
-
-    server = criarServidor(HOST, PORT)
-
-    conn, addr = server.accept()
-    print(f"Conectado com {addr[0]}")
-    conn.sendall('Conectado ao servidor!'.encode('utf-8'))
-    threading.Thread(target=receberMensagem, args=[conn, addr]).start()
-    threading.Thread(target=enviarMensagem, args=[conn]).start()
-
-
-def criarServidor(host:str, port:int):
-    """Cria o servidor no host e port informada.
-    Argumentos:
-        host: Endereço de IP host do servidor.
-        port: Porta do servidor.
-
-    Retorno:
-        server: Retorna o objeto socket do servidor já configurado e escutando no host e port informada.
-    """
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((host, port))
-    server.listen()
-    print(f"Servidor escutando: {host, port}")
-    print('Esperando conexão com o cliente.')
-    return server
-
-
-def enviarMensagem(clientconn, msg=""):
-    """Envia mensagem ao 'clientconn' informado.
-    Se msg for informado a mensagem que será enviada é o msg, caso contrário terá um input para um usuário no servidor.
-
-    Argumentos:
-        clientconn: Objeto da conexão com o cliente.
-        msg: Mensagem a ser enviada para o cliente.
+    def acceptConnectionService(self):
+        while True:
+            conn, addr = self.server.accept()
+            connection = Connection(conn, addr)
+            t1 = threading.Thread(target=self.receiveMessageService, args=[connection]).start()
+            self.connections.append(Connection(conn, addr))
     
-    Retorno:
-        Sem retorno.
-    """
-    while True:
-        try:
-            msg = input()
-            clientconn.sendall(msg.encode('utf-8'))
-            print()
-        except:
-            clientconn.sendall(msg.encode('utf-8'))
-
-
-def receberMensagem(clientconn, addr):
-    """Recebe as mensagens do objeto de conexão clientconn informado e exibe no terminal do servidor.
-
-    Argumentos:
-        clientconn: Objeto da conexão com o cliente.
-        addr: Endereço de IP do cliente.
+    def receiveMessageService(self, connection: Connection) -> None:
+        while True:
+            try:
+                message = connection.conn.recv(2048).decode("utf-8")
+                self.messages.append(Message(connection, message))
+                print(f"{connection.address}: {message}")
+            except:
+                pass
     
-    Retorno:
-        Sem retorno.
-    """
-    while True:
-        try:
-            msg = clientconn.recv(2048).decode('utf-8')
-            print(f"{addr}: {msg}\n")
-        except:
-            pass
+    def sendMessageService(self) -> None:
+        while True:
+            if len(self.messages) > 0:
+                try:
+                    message = self.messages.pop(0)
+                    print(message)
+                    for connection in self.connections:
+                        if connection.address != message.connection.address:
+                            connection.conn.sendall(message.message.encode("utf-8"))
+                except:
+                    pass
 
-
-if __name__ == "__main__":
-    main()
+server = Server(HOST, PORT)

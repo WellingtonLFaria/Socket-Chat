@@ -2,6 +2,12 @@ import socket
 import sys
 import threading
 
+try:
+    HOST = sys.argv[1]
+    PORT = int(sys.argv[2])
+except:
+    HOST = '127.0.0.1'
+    PORT = 8080
 
 def main():
     """Coloca o cliente em execução no host e port informada na chamada do sistema ou nas configurações padrão:
@@ -18,15 +24,17 @@ def main():
         Retorno:
             Sem retorno.
     """
-    try:
-        HOST = sys.argv[1]
-        PORT = int(sys.argv[2])
-    except:
-        HOST = '127.0.0.1'
-        PORT = 8080
+    global HOST
+    global PORT
+    while True:
+        try:
+            username = input("Nome de usuário: ")
+            break
+        except:
+            print("Algum erro ocorreu. Tente novamente...")
 
     client = criarCliente(HOST, PORT)
-    threading.Thread(target=enviarMensagem, args=[client]).start()
+    threading.Thread(target=enviarMensagem, args=[client, username]).start()
     threading.Thread(target=receberMensagem, args=[client]).start()
 
 
@@ -48,7 +56,9 @@ def criarCliente(host:str, port:int):
     return client
 
 
-def enviarMensagem(cliente):
+def enviarMensagem(cliente, username):
+    global HOST
+    global PORT
     """Envia a mensagem informada pelo usuário ao servidor.
     
     Argumentos:
@@ -60,8 +70,7 @@ def enviarMensagem(cliente):
     while True:
         try:
             msg = input()
-            cliente.sendall(msg.encode('utf-8'))
-            print()
+            cliente.sendall(f"{username}|{msg}".encode('utf-8'))
         except:
             pass
 
@@ -78,7 +87,7 @@ def receberMensagem(cliente):
     while True:
         try:
             msg = cliente.recv(2048).decode('utf-8')
-            print(f"Servidor: {msg}\n")
+            print(f"{msg.split("|")[0]}: {msg.split("|")[1]}\n")
         except:
             pass
 
